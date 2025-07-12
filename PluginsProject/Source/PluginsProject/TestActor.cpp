@@ -28,10 +28,10 @@ void ATestActor::Tick(float DeltaTime)
 	if (ScopedContext)
 	{
 		// Your ImGui code goes here!
-		//ImGui::ShowDemoWindow();
-		ImGui::Begin(TCHAR_TO_UTF8(*GetActorLabel()));
-		ImGui::Button("TestButton");
-		ImGui::End();
+		ImGui::ShowDemoWindow();
+		// ImGui::Begin(TCHAR_TO_UTF8(*GetActorLabel()));
+		// ImGui::Button("TestButton");
+		// ImGui::End();
 	}
 }
 

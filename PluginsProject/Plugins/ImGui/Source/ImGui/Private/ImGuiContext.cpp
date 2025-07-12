@@ -91,6 +91,7 @@ static void ImGui_CreateWindow(ImGuiViewport* Viewport)
 			.CreateTitleBar(false)
 			.LayoutBorder(0)
 			.UserResizeBorder(0)
+			.Tag("ImGuiWindow")
 			.UseOSWindowBorder(false)
 			[
 				SAssignNew(ViewportData->Overlay, SImGuiOverlay)
@@ -312,6 +313,8 @@ TSharedRef<FImGuiContext> FImGuiContext::Create()
 {
 	TSharedRef<FImGuiContext> Context = MakeShared<FImGuiContext>();
 	Context->Initialize();
+
+	Context->BeginFrame();
 
 	return Context;
 }

@@ -13,17 +13,24 @@
 #endif
 
 #include "ImGuiContext.h"
+#include "ImGuiWindowRegistrar.h"
 #include "SImGuiOverlay.h"
 
 void FImGuiModule::StartupModule()
 {
 #if WITH_EDITOR
+	FEditorDelegates::StartPIE.AddRaw(this, &FImGuiModule::OnStartPIE);
 	FEditorDelegates::EndPIE.AddRaw(this, &FImGuiModule::OnEndPIE);
 #endif
 
 #if WITH_ENGINE
 	UGameViewportClient::OnViewportCreated().AddRaw(this, &FImGuiModule::OnViewportCreated);
 #endif
+
+#if WITH_IMGUI
+	ImGuiManager = MakeUnique<FImGuiManager>();
+	FWorldDelegates::OnWorldTickEnd.AddRaw(this, &FImGuiModule::OnWorldTickEnd);
+#endif // WITH_IMGUI
 }
 
 void FImGuiModule::ShutdownModule()
@@ -36,6 +43,11 @@ void FImGuiModule::ShutdownModule()
 	UGameViewportClient::OnViewportCreated().RemoveAll(this);
 #endif
 
+#if WITH_IMGUI
+	FWorldDelegates::OnWorldTickEnd.RemoveAll(this);
+	ImGuiManager.Reset();
+#endif // WITH_IMGUI
+	
 	SessionContexts.Reset();
 }
 
@@ -43,6 +55,21 @@ FImGuiModule& FImGuiModule::Get()
 {
 	static FImGuiModule& Module = FModuleManager::LoadModuleChecked<FImGuiModule>(UE_MODULE_NAME);
 	return Module;
+}
+
+FImGuiManager* FImGuiModule::GetImGuiManager() const
+{
+	return ImGuiManager.Get();
+}
+
+void FImGuiModule::AddWindowRegistrar(FImGuiWindowRegistrar* InRegistrar)
+{
+	WindowRegistrars.Add(MakeShareable<FImGuiWindowRegistrar>(InRegistrar));
+}
+
+TArray<TSharedPtr<FImGuiWindowRegistrar>>::TConstIterator FImGuiModule::GetWindowRegistrarConstIterator() const
+{
+	return WindowRegistrars.CreateConstIterator();
 }
 
 TSharedPtr<FImGuiContext> FImGuiModule::FindOrCreateSessionContext(const int32 PieSessionId)
@@ -106,6 +133,11 @@ TSharedPtr<FImGuiContext> FImGuiModule::FindOrCreateSessionContext(const int32 P
 	return Context;
 }
 
+void FImGuiModule::OnStartPIE(bool bIsSimulating)
+{
+	ImGuiManager->OnGameBegin();
+}
+
 void FImGuiModule::OnEndPIE(bool bIsSimulating)
 {
 	for (auto ContextIt = SessionContexts.CreateIterator(); ContextIt; ++ContextIt)
@@ -115,6 +147,8 @@ void FImGuiModule::OnEndPIE(bool bIsSimulating)
 			ContextIt.RemoveCurrent();
 		}
 	}
+
+	ImGuiManager->OnGameEnd();
 }
 
 void FImGuiModule::OnViewportCreated() const
@@ -151,6 +185,16 @@ void FImGuiModule::OnViewportCreated() const
 		GameViewport->AddViewportWidgetContent(Overlay, TNumericLimits<int32>::Max());
 	}
 #endif
+}
+
+void FImGuiModule::OnWorldTickEnd(UWorld* World, ELevelTick TickType, float DeltaSeconds)
+{
+#if WITH_IMGUI
+	if (World && (World->WorldType == EWorldType::Game || World->WorldType == EWorldType::PIE))
+	{
+		ImGuiManager->Tick();
+	}
+#endif // WITH_IMGUI
 }
 
 TSharedPtr<FImGuiContext> FImGuiModule::CreateWindowContext(const TSharedRef<SWindow>& Window)
